@@ -29,7 +29,7 @@ public class FrameMantenimientoRaza extends javax.swing.JFrame {
         initComponents();
         this.setLocationRelativeTo(null);
         tipo = 0;
-        CP = new ConexionPostgres("dbProyecto", "usrUTN", "12345");
+        CP = new ConexionPostgres();
         correr();
         ResultSet datos = CP.select("cod_especie", "\"schProyecto\".\"especie\"", "");
         ResultSet datos2 = CP.select("descripcion", "\"schProyecto\".\"especie\"", "");

@@ -1,0 +1,11 @@
+[
+  {
+    "project": "Proyecto2/build.xml",
+    "source": "checks/VetCheck.java",
+    "main": "VetCheck",
+    "headless": true,
+    "classpath": [
+      "Proyecto2/lib/postgresql-42.7.14.jar"
+    ]
+  }
+]

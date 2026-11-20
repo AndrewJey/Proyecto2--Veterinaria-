@@ -27,7 +27,7 @@ public class FrameCrearCita extends javax.swing.JFrame {
         initComponents();
         this.setLocationRelativeTo(null);
         tipo = 0;
-        CP = new ConexionPostgres("dbProyecto", "usrUTN", "12345");
+        CP = new ConexionPostgres();
         correr();
         comboMascota();
         comboAnno();
@@ -294,7 +294,7 @@ public class FrameCrearCita extends javax.swing.JFrame {
             String estado;
             String datos;
             datos = " where cedula = " + "'" + this.cod.getText() + "'";
-            estado = this.CP.borrar("\"schProyecto\".dueno", datos);
+            estado = this.CP.borrar("\"schProyecto\".cita", datos);
             correr();
             cod.setText("");
         }

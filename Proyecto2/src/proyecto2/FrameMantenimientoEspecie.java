@@ -27,7 +27,7 @@ public class FrameMantenimientoEspecie extends javax.swing.JFrame {
         initComponents();
         this.setLocationRelativeTo(null);
         tipo = 0;
-        CP = new ConexionPostgres("dbProyecto", "usrUTN", "12345");
+        CP = new ConexionPostgres();
         correr();
         //llenar();
     }

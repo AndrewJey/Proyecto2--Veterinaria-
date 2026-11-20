@@ -1,92 +1,72 @@
-/*
- * To change this template, choose Tools | Templates * and open the template in the editor.
- */
 package proyecto2;
 
 import java.sql.*;
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.SQLException;
+import javax.sql.rowset.CachedRowSet;
+import javax.sql.rowset.RowSetProvider;
 
-/**
- *
- * @author UTN
- */
-public class ConexionPostgres {
+/** Conexiones configurables; nunca deja una conexión nula tras un fallo. */
+public class ConexionPostgres implements AutoCloseable {
+    private final Connection conn;
 
-    private Connection conn; //Se Crea Variable "Conexión" con Base de Datos
+    public ConexionPostgres() throws ClassNotFoundException, SQLException {
+        this(env("VET_DATABASE", "dbProyecto"), env("VET_USER", "postgres"), env("VET_PASSWORD", ""));
+    }
 
-    //Se Crea el Método Constructor
-    public ConexionPostgres(String pNombreDB, String pUser, String dPassword) throws ClassNotFoundException, SQLException {
-        try {
-            String driver = "org.postgresql.Driver"; //Se Asigna el Driver de "Conexión" con Base de Datos
-            Class.forName(driver);
-            String connString = "jdbc:postgresql://localhost:5432/" + pNombreDB; //String de Conexión
-            String user = pUser; //Usuario de PostGreSQL 9.2
-            String password = dPassword; //Constraseña de Usuario del PostGreS
+    public ConexionPostgres(String nombreDB, String user, String password) throws ClassNotFoundException, SQLException {
+        Class.forName("org.postgresql.Driver");
+        String url = env("VET_JDBC_URL", "jdbc:postgresql://127.0.0.1:5432/" + nombreDB);
+        java.util.Properties propiedades = new java.util.Properties();
+        propiedades.setProperty("user", env("VET_USER", user));
+        propiedades.setProperty("password", env("VET_PASSWORD", password));
+        propiedades.setProperty("connectTimeout", "5");
+        this.conn = DriverManager.getConnection(url, propiedades);
+    }
 
-            this.conn = DriverManager.getConnection(connString, user, password); //Se Realiza la Conexión
-            System.out.println("Conexión Realizada con Éxito");
-        } catch (SQLException e) {
-            System.out.println(e.toString());
+    public ConexionPostgres(Connection connection) {
+        this.conn = java.util.Objects.requireNonNull(connection);
+    }
+
+    private static String env(String key, String fallback) {
+        String value = System.getenv(key);
+        return value == null ? fallback : value;
+    }
+
+    public ResultSet query(String sql, Object... parameters) throws SQLException {
+        try (PreparedStatement statement = conn.prepareStatement(sql)) {
+            bind(statement, parameters);
+            try (ResultSet rows = statement.executeQuery()) {
+                CachedRowSet result = RowSetProvider.newFactory().createCachedRowSet();
+                result.populate(rows);
+                return result;
+            }
         }
     }
 
-    public ResultSet select(String pCampos, String pTabla, String pCondicion) {
-        ResultSet rs = null;//obtener los datos del select
-        Statement s = null;//se utiliza para inicializar la conexión
-        String sentencia = "";
-        try {
-            s = this.conn.createStatement();//se inicializa la conexión
-            sentencia = " select " + pCampos + " from " + pTabla;//se crea el select
-            rs = s.executeQuery(sentencia);//se ejecuta y se obtienen los datos
-        } catch (Exception e) {
-            System.out.println("Error: " + e.toString());
+    public int execute(String sql, Object... parameters) throws SQLException {
+        try (PreparedStatement statement = conn.prepareStatement(sql)) {
+            bind(statement, parameters);
+            return statement.executeUpdate();
         }
-        return (rs);
     }
 
-    public String insertar(String pTabla, String pValores) {
-        Statement s = null;
-        String sentencia = "";
-        String retorno = "Datos Insertados";
-        try {
-            s = this.conn.createStatement();
-            sentencia = "insert into " + pTabla + " values " + pValores;
-            s.executeQuery(sentencia);
-        } catch (SQLException e) {
-            System.err.println(e.toString());
-            retorno = e.toString();
-        }
-        return (retorno);
+    private static void bind(PreparedStatement statement, Object[] parameters) throws SQLException {
+        for (int i = 0; i < parameters.length; i++) statement.setObject(i + 1, parameters[i]);
     }
 
-    public String modificar(String pTabla, String pValores) {
-        String sentencia = "";
-        String retorno = "Datos Modificados";
-        Statement s = null;
-        try {
-            s = this.conn.createStatement();
-            sentencia = " update " + pTabla + " " + pValores;
-            s.executeQuery(sentencia);
-        } catch (Exception e) {
-            retorno = e.toString();
-        }
-        return retorno;
+    // Legacy fragments remain for compatibility with the original forms.
+    // Do not expose these methods to untrusted SQL or an external service.
+    public ResultSet select(String campos, String tabla, String condicion) {
+        try { return query("SELECT " + campos + " FROM " + tabla + (condicion == null || condicion.trim().isEmpty() ? "" : " " + condicion.trim())); }
+        catch (SQLException error) { throw new IllegalStateException("No se pudo consultar la base de datos.", error); }
     }
-    
-    public String borrar(String pTabla, String pValores){
-    String sentencia = "";
-    String retorno = "Datos Modificados";
-    Statement s = null;
-    try{
-    s = this.conn.createStatement();
-    sentencia = "delete from "+ pTabla+pValores;
-    s.executeQuery(sentencia);
+
+    public String insertar(String tabla, String valores) { return mutate("INSERT INTO " + tabla + " VALUES " + valores, "Datos Insertados"); }
+    public String modificar(String tabla, String valores) { return mutate("UPDATE " + tabla + " " + valores, "Datos Modificados"); }
+    public String borrar(String tabla, String valores) { return mutate("DELETE FROM " + tabla + " " + valores, "Datos Eliminados"); }
+    private String mutate(String sql, String result) {
+        try { int count = execute(sql); return count > 0 ? result : "No se modificaron registros"; }
+        catch (SQLException error) { return "No se pudo modificar la base de datos (SQLState " + error.getSQLState() + ")"; }
     }
-    catch(Exception e){
-    retorno = e.toString();
-    }
-    return retorno;
-    }
+
+    @Override public void close() throws SQLException { conn.close(); }
 }
